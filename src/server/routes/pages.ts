@@ -117,6 +117,50 @@ export function pageRoutes() {
       },
     },
 
+    "/api/pages/availability": {
+      async GET(req: Request) {
+        if (!isDBConfigured()) return json(503, { error: "Database not configured" });
+        const auth = getAuthContext(req, { jwtSecret: JWT_SECRET });
+        if (!auth) return json(401, { error: "Não autenticado" });
+
+        const url = new URL(req.url);
+        const slug = sanitizeSlug(url.searchParams.get("slug") || "");
+        const pageIdParam = url.searchParams.get("pageId");
+        const pageId = pageIdParam ? Number.parseInt(pageIdParam, 10) : null;
+
+        if (!slug) {
+          return json(200, { available: false, message: "Informe um endereço válido." });
+        }
+        if (slug.length < 3 || slug.length > 40) {
+          return json(200, { available: false, message: "O endereço deve ter entre 3 e 40 caracteres." });
+        }
+        if (RESERVED_SLUGS.has(slug)) {
+          return json(200, { available: false, message: "Esse endereço é reservado. Escolha outro." });
+        }
+
+        try {
+          const pool = await getPool();
+          const [rows]: any = await pool.query(
+            "SELECT id, user_id FROM profile_pages WHERE slug = ? LIMIT 1",
+            [slug]
+          );
+          const owner = rows?.[0];
+          if (!owner) return json(200, { available: true });
+
+          const sameUser = owner.user_id === auth.userId;
+          const samePage = typeof pageId === "number" && !Number.isNaN(pageId) && owner.id === pageId;
+          if (sameUser || samePage) {
+            return json(200, { available: true });
+          }
+
+          return json(200, { available: false, message: "Esse endereço já está em uso. Escolha outro." });
+        } catch (e: any) {
+          console.error("Slug availability error:", e);
+          return json(500, { error: "Erro interno" });
+        }
+      },
+    },
+
     "/api/pages/me": async (req: Request) => {
       if (!isDBConfigured()) return json(503, { error: "Database not configured" });
       const auth = getAuthContext(req, { jwtSecret: JWT_SECRET });
