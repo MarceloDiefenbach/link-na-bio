@@ -17,7 +17,7 @@ export function LoginForm({ onSwitch, onSuccess }: { onSwitch?: () => void; onSu
 
   useEffect(() => {
     api.me().then(res => {
-      if (res.ok) navigate("/app/blank");
+      if (res.ok) navigate("/app");
     });
   }, []);
 
@@ -29,7 +29,7 @@ export function LoginForm({ onSwitch, onSuccess }: { onSwitch?: () => void; onSu
       const res = await api.login({ email, password });
       if (res.ok) {
         setMessage(lbl.success);
-        navigate("/app/blank");
+        navigate("/app");
       } else {
         setMessage(res.error);
       }

@@ -18,7 +18,7 @@ export function RegisterForm({ onSwitch, onSuccess }: { onSwitch?: () => void; o
 
   useEffect(() => {
     api.me().then(res => {
-      if (res.ok) navigate("/app/blank");
+      if (res.ok) navigate("/app");
     });
   }, []);
 
