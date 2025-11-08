@@ -27,3 +27,11 @@ export const getMyPage = (slug: string) =>
 
 export const getPublicPage = (slug: string) =>
   request<ProfilePage>(`/api/pages?slug=${encodeURIComponent(slug)}`);
+
+export const checkPageSlugAvailability = (slug: string, pageId?: number | null) => {
+  const params = new URLSearchParams({ slug });
+  if (typeof pageId === "number" && !Number.isNaN(pageId)) {
+    params.set("pageId", String(pageId));
+  }
+  return request<{ available: boolean; message?: string }>(`/api/pages/availability?${params.toString()}`);
+};

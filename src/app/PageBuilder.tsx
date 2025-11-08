@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -12,12 +12,21 @@ type FormState = {
   instagram_url: string;
 };
 
+type SlugCheckState =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "available" }
+  | { status: "unavailable"; message: string }
+  | { status: "error"; message: string };
+
 const INITIAL_STATE: FormState = {
   slug: "",
   title: "",
   description: "",
   instagram_url: "",
 };
+
+const DEFAULT_UNAVAILABLE_MESSAGE = "Esse endereço não está disponível. Escolha outro.";
 
 function sanitizeSlugInput(value: string) {
   return value
@@ -36,6 +45,12 @@ export function PageBuilder({ slug }: { slug?: string | null }) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [slugCheck, setSlugCheck] = useState<SlugCheckState>({ status: "idle" });
+  const currentSlugRef = useRef(form.slug);
+
+  useEffect(() => {
+    currentSlugRef.current = form.slug;
+  }, [form.slug]);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +62,7 @@ export function PageBuilder({ slug }: { slug?: string | null }) {
       setForm(INITIAL_STATE);
       setPageId(null);
       setLoading(false);
+      setSlugCheck({ status: "idle" });
       return;
     }
 
@@ -68,6 +84,11 @@ export function PageBuilder({ slug }: { slug?: string | null }) {
           instagram_url: res.data.instagram_url || "",
         });
         setPageId(res.data.id);
+        if (res.data.slug) {
+          setSlugCheck({ status: "available" });
+        } else {
+          setSlugCheck({ status: "idle" });
+        }
       }
       setLoading(false);
     });
@@ -92,6 +113,41 @@ export function PageBuilder({ slug }: { slug?: string | null }) {
 
   const onChange = (field: keyof FormState) => (value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
+    if (field === "slug") {
+      setSlugCheck({ status: "idle" });
+    }
+  };
+
+  const checkSlugAvailability = async (
+    slugValue: string
+  ): Promise<{ available: boolean; message?: string; stale?: boolean }> => {
+    const targetSlug = slugValue.trim();
+    if (!targetSlug) {
+      setSlugCheck({ status: "idle" });
+      return { available: false };
+    }
+
+    setSlugCheck({ status: "checking" });
+    const res = await api.checkPageSlugAvailability(targetSlug, pageId ?? undefined);
+
+    if (currentSlugRef.current !== targetSlug) {
+      return { available: false, stale: true };
+    }
+
+    if (!res.ok) {
+      const fallback = res.error || "Não foi possível verificar a disponibilidade do endereço.";
+      setSlugCheck({ status: "error", message: fallback });
+      return { available: false, message: fallback };
+    }
+
+    if (res.data.available) {
+      setSlugCheck({ status: "available" });
+      return { available: true };
+    }
+
+    const message = res.data.message || DEFAULT_UNAVAILABLE_MESSAGE;
+    setSlugCheck({ status: "unavailable", message });
+    return { available: false, message };
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -101,6 +157,30 @@ export function PageBuilder({ slug }: { slug?: string | null }) {
       setMessage("Escolha um endereço para sua página.");
       return;
     }
+
+    if (slugCheck.status === "checking") {
+      window.alert("Estamos verificando a disponibilidade do endereço. Aguarde um instante e tente novamente.");
+      return;
+    }
+
+    let availability =
+      slugCheck.status === "available" && currentSlugRef.current === form.slug
+        ? { available: true }
+        : await checkSlugAvailability(form.slug);
+
+    if (availability.stale) {
+      availability = await checkSlugAvailability(form.slug);
+      if (availability.stale) {
+        window.alert("Não foi possível verificar a disponibilidade do endereço. Tente novamente.");
+        return;
+      }
+    }
+
+    if (!availability.available) {
+      window.alert(availability.message || DEFAULT_UNAVAILABLE_MESSAGE);
+      return;
+    }
+
     setSaving(true);
     const payload = {
       id: pageId ?? undefined,
@@ -126,6 +206,7 @@ export function PageBuilder({ slug }: { slug?: string | null }) {
       description: res.data.description || "",
       instagram_url: res.data.instagram_url || "",
     });
+    setSlugCheck({ status: "available" });
     const targetPath = `/app/pagina/${res.data.slug}`;
     if (typeof window !== "undefined" && location.pathname !== targetPath) {
       navigate(targetPath);
@@ -205,6 +286,7 @@ export function PageBuilder({ slug }: { slug?: string | null }) {
                     id="slug"
                     value={form.slug}
                     onChange={e => onChange("slug")(sanitizeSlugInput(e.target.value))}
+                    onBlur={() => checkSlugAvailability(form.slug)}
                     placeholder="seu-nome"
                     className="border-0 focus-visible:ring-0"
                     required
@@ -213,6 +295,19 @@ export function PageBuilder({ slug }: { slug?: string | null }) {
                 <p className="text-xs text-neutral-500">
                   Use letras minúsculas, números e hífens. Máximo de 40 caracteres.
                 </p>
+                {slugCheck.status === "checking" && (
+                  <p className="text-xs text-neutral-500">Verificando disponibilidade do endereço...</p>
+                )}
+                {slugCheck.status === "unavailable" && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                    {slugCheck.message}
+                  </div>
+                )}
+                {slugCheck.status === "error" && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-600">
+                    {slugCheck.message}
+                  </div>
+                )}
               </div>
             </div>
 
