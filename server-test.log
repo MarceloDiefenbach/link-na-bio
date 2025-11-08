@@ -1,0 +1,35 @@
+🚀 Server running at http://localhost:3002/
+DB init error: 31 |     if (connection instanceof PromisePoolConnection) connection.release();
+32 |   }
+33 | 
+34 |   query(sql, args) {
+35 |     const corePool = this.pool;
+36 |     const localErr = new Error();
+                          ^
+error: connect ETIMEDOUT
+      errno: undefined,
+        sql: undefined,
+   sqlState: undefined,
+ sqlMessage: undefined,
+       code: "ETIMEDOUT"
+
+      at query (/Users/marcelodiefenbach/reac projects/site/node_modules/mysql2/lib/promise/pool.js:36:22)
+      at ensureSchema (/Users/marcelodiefenbach/reac projects/site/src/server/db.ts:37:14)
+
+Register error: 31 |     if (connection instanceof PromisePoolConnection) connection.release();
+32 |   }
+33 | 
+34 |   query(sql, args) {
+35 |     const corePool = this.pool;
+36 |     const localErr = new Error();
+                          ^
+error: connect ETIMEDOUT
+      errno: undefined,
+        sql: undefined,
+   sqlState: undefined,
+ sqlMessage: undefined,
+       code: "ETIMEDOUT"
+
+      at query (/Users/marcelodiefenbach/reac projects/site/node_modules/mysql2/lib/promise/pool.js:36:22)
+      at POST (/Users/marcelodiefenbach/reac projects/site/src/index.tsx:77:37)
+
